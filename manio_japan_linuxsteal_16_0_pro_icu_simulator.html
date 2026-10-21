@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manio.japan linuxsteal 16.0 Pro ICU Ventilator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #080c14;
+            color: #e2e8f0;
+            user-select: none;
+        }
+        .font-mono-tech {
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .font-cyber {
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* Custom Glowing Neumorphic Cyber Borders & FX */
+        .cyber-glass {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.7) 100%);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .cyber-glass-active {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.25);
+        }
+        .cyber-card-cyan {
+            border-left: 4px solid #06b6d4;
+        }
+        .cyber-card-green {
+            border-left: 4px solid #10b981;
+        }
+        .cyber-card-amber {
+            border-left: 4px solid #f59e0b;
+        }
+        .cyber-card-purple {
+            border-left: 4px solid #a855f7;
+        }
+        .cyber-card-rose {
+            border-left: 4px solid #f43f5e;
+        }
+
+        /* Pulse Animations */
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(1000%); }
+        }
+        .scanline-effect {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: rgba(56, 189, 248, 0.2);
+            opacity: 0.6;
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { background-color: rgba(225, 29, 72, 0.2); border-color: rgba(225, 29, 72, 0.8); }
+            50% { background-color: rgba(225, 29, 72, 0.6); border-color: rgba(255, 255, 255, 1); box-shadow: 0 0 25px rgba(225, 29, 72, 0.8); }
+        }
+        .alarm-active-critical {
+            animation: pulse-red 0.8s infinite;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0284c7;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-[#050811] text-slate-100">
+
+    <!-- TOP HEADER / STATUS BAR -->
+    <header class="h-14 bg-slate-950/80 border-b border-cyan-900/40 px-4 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-microchip text-cyan-400 text-xl animate-pulse"></i>
+                <span class="font-cyber font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-400 text-lg">
+                    MANIO.JAPAN
+                </span>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono border border-cyan-800/60">
+                linuxsteal 16.0 Pro ICU
+            </span>
+            <span id="powerStatusBadge" class="text-xs px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 font-mono border border-emerald-800/60 flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> СИСТЕМА АКТИВНА
+            </span>
+        </div>
+
+        <!-- ALARM BANNER IN HEADER -->
+        <div id="headerAlarmBanner" class="hidden flex-1 mx-6 h-9 rounded-lg bg-rose-950/80 border border-rose-500 flex items-center justify-between px-4 text-rose-200 font-medium text-sm animate-pulse">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-rose-400 text-base"></i>
+                <span id="headerAlarmText" class="font-bold tracking-wide">КРИТИЧЕСКАЯ ТРЕВОГА: ГИПОКСИЯ</span>
+            </div>
+            <button onclick="silenceAlarms()" class="px-2 py-1 bg-rose-900 hover:bg-rose-800 text-xs rounded border border-rose-400 text-white transition">
+                <i class="fa-solid fa-bell-slash mr-1"></i> Заглушить (120s)
+            </button>
+        </div>
+
+        <!-- SYSTEM CONTROLS & TIME -->
+        <div class="flex items-center space-x-4">
+            <!-- AUDIO TOGGLE -->
+            <button id="audioMasterBtn" onclick="toggleMasterAudio()" class="p-2 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-500 text-slate-300 hover:text-cyan-400 transition flex items-center gap-2 text-xs">
+                <i id="audioMasterIcon" class="fa-solid fa-volume-high text-cyan-400 text-sm"></i>
+                <span id="audioMasterLabel">Звук Вкл</span>
+            </button>
+
+            <!-- SIMULATION SPEED -->
+            <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
+                <span class="text-slate-400 px-2 font-mono">Скорость:</span>
+                <button onclick="setSimSpeed(1)" id="spd1" class="px-2 py-0.5 rounded bg-cyan-600 text-white font-bold">1x</button>
+                <button onclick="setSimSpeed(2)" id="spd2" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">2x</button>
+                <button onclick="setSimSpeed(5)" id="spd5" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">5x</button>
+            </div>
+
+            <!-- TIME DISPLAY -->
+            <div class="font-mono text-cyan-300 text-sm font-semibold tracking-wider bg-slate-900/80 px-3 py-1 rounded border border-slate-800">
+                <i class="fa-regular fa-clock mr-1 text-slate-400"></i>
+                <span id="clockDisplay">00:00:00</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN APP WRAPPER -->
+    <div class="flex-1 flex overflow-hidden relative">
+        <div class="scanline-effect"></div>
+
+        <!-- NAVIGATION SIDEBAR -->
+        <aside class="w-56 bg-slate-950 border-r border-slate-800/80 flex flex-col justify-between shrink-0 p-3 z-10">
+            <div class="space-y-1.5">
+                <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase px-3 py-1">Навигация</div>
+                
+                <button onclick="switchTab('home')" id="tabBtn-home" class="nav-tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition cyber-glass-active text-cyan-400">
+                    <i class="fa-solid fa-[#00d2ff] fa-chart-line w-5 text-center text-cyan-400"></i>
+                    <span>Главный экран</span>
+                </button>
+
+                <button onclick="switchTab('alarms')" id="tabBtn-alarms" class="nav-tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    <i class="fa-solid fa-bell w-5 text-center text-amber-400"></i>
+                    <span>Тревоги</span>
+                    <span id="activeAlarmCountBadge" class="ml-auto bg-rose-600 text-white text-[10px] px-1.5 py-0.2 rounded-full hidden">0</span>
+                </button>
+
+                <button onclick="switchTab('smv')" id="tabBtn-smv" class="nav-tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    <i class="fa-solid fa-lungs w-5 text-center text-emerald-400"></i>
+                    <span>Режим SIMV</span>
+                </button>
+
+                <button onclick="switchTab('pcvg')" id="tabBtn-pcvg" class="nav-tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    <i class="fa-solid fa-sliders w-5 text-center text-blue-400"></i>
+                    <span>Режим PC-VG</span>
+                </button>
+
+                <button onclick="switchTab('lab')" id="tabBtn-lab" class="nav-tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    <i class="fa-solid fa-vial-circle-check w-5 text-center text-purple-400"></i>
+                    <span>Лаборатория (КЩС)</span>
+                </button>
+
+                <button onclick="switchTab('log')" id="tabBtn-log" class="nav-tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    <i class="fa-solid fa-list-check w-5 text-center text-slate-400"></i>
+                    <span>Журнал событий</span>
+                </button>
+            </div>
+
+            <!-- CLINICAL PROCEDURES / QUICK ACTION PANEL -->
+            <div class="space-y-2 border-t border-slate-800/80 pt-3">
+                <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase px-3 py-1">Интервенции / Механики</div>
+
+                <!-- ASPIRATION TOGGLE BUTTON -->
+                <button id="aspirationBtn" onclick="toggleAspiration()" class="w-full py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-amber-950/60 border border-slate-700 hover:border-amber-500 text-slate-300 hover:text-amber-300 text-xs font-semibold flex items-center justify-between transition">
+                    <span class="flex items-center gap-2">
+                        <i class="fa-solid fa-pump-soap text-amber-400"></i>
+                        <span>Санация (Отсос)</span>
+                    </span>
+                    <span id="aspBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">ВЫКЛ</span>
+                </button>
+
+                <!-- DRUGS CONTROLS -->
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button onclick="administerDrug('adrenaline')" class="p-2 rounded bg-slate-900 hover:bg-rose-950/60 border border-slate-800 hover:border-rose-500 text-[11px] text-slate-300 hover:text-rose-300 font-medium transition flex flex-col items-center">
+                        <i class="fa-solid fa-syringe text-rose-400 mb-1"></i>
+                        <span>Адреналин</span>
+                    </button>
+                    <button onclick="administerDrug('surfactant')" class="p-2 rounded bg-slate-900 hover:bg-teal-950/60 border border-slate-800 hover:border-teal-500 text-[11px] text-slate-300 hover:text-teal-300 font-medium transition flex flex-col items-center">
+                        <i class="fa-solid fa-droplet text-teal-400 mb-1"></i>
+                        <span>Сурфактант</span>
+                    </button>
+                </div>
+
+                <button onclick="administerDrug('sedation')" class="w-full py-1.5 px-3 rounded bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 hover:border-indigo-500 text-xs text-slate-300 hover:text-indigo-300 font-medium transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-pills text-indigo-400"></i>
+                    <span>Седация (Пропофол)</span>
+                </button>
+
+                <!-- RESUSCITATION / TURBOCHARGE BUTTON -->
+                <button onclick="triggerResuscitationTurbocharge()" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2 border border-cyan-300/40 transition transform active:scale-95">
+                    <i class="fa-solid fa-bolt text-yellow-300 text-sm animate-bounce"></i>
+                    <span>TURBOCHARGE (1-Click)</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- CONTENT AREA (TABBED VIEWS) -->
+        <main class="flex-1 overflow-y-auto p-4 relative bg-[#070b14]">
+
+            <!-- ================= TAB 1: HOME / MONITORING ================= -->
+            <div id="tabContent-home" class="tab-view space-y-4">
+                
+                <!-- TOP VITALS ROW -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    
+                    <!-- SpO2 -->
+                    <div class="cyber-glass cyber-card-cyan rounded-xl p-3 relative overflow-hidden">
+                        <div class="flex justify-between items-start text-xs text-cyan-400 font-semibold mb-1">
+                            <span>SpO2 (Пульсоксиметрия)</span>
+                            <i class="fa-solid fa-heart-pulse"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="valSpO2" class="text-3xl font-cyber font-black text-cyan-300">98</span>
+                            <span class="text-xs text-slate-400 font-mono">%</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-1 flex justify-between">
+                            <span>Норма: 95-100%</span>
+                            <span id="statusSpO2" class="text-emerald-400 font-bold">ОК</span>
+                        </div>
+                    </div>
+
+                    <!-- PULSE / HR -->
+                    <div class="cyber-glass cyber-card-rose rounded-xl p-3 relative overflow-hidden">
+                        <div class="flex justify-between items-start text-xs text-rose-400 font-semibold mb-1">
+                            <span>ЧСС / Пульс</span>
+                            <i class="fa-solid fa-wave-square"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="valHR" class="text-3xl font-cyber font-black text-rose-400">75</span>
+                            <span class="text-xs text-slate-400 font-mono">bpm</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-1 flex justify-between">
+                            <span>Норма: 60-90</span>
+                            <span id="statusHR" class="text-emerald-400 font-bold">ОК</span>
+                        </div>
+                    </div>
+
+                    <!-- EtCO2 -->
+                    <div class="cyber-glass cyber-card-amber rounded-xl p-3 relative overflow-hidden">
+                        <div class="flex justify-between items-start text-xs text-amber-400 font-semibold mb-1">
+                            <span>EtCO2 (Капнография)</span>
+                            <i class="fa-solid fa-smog"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="valEtCO2" class="text-3xl font-cyber font-black text-amber-300">38</span>
+                            <span class="text-xs text-slate-400 font-mono">mmHg</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-1 flex justify-between">
+                            <span>Норма: 35-45</span>
+                            <span id="statusEtCO2" class="text-emerald-400 font-bold">ОК</span>
+                        </div>
+                    </div>
+
+                    <!-- PPEAK -->
+                    <div class="cyber-glass cyber-card-purple rounded-xl p-3 relative overflow-hidden">
+                        <div class="flex justify-between items-start text-xs text-purple-400 font-semibold mb-1">
+                            <span>Ppeak (Пик Давл.)</span>
+                            <i class="fa-solid fa-gauge-high"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="valPpeak" class="text-3xl font-cyber font-black text-purple-300">22</span>
+                            <span class="text-xs text-slate-400 font-mono">mbar</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-1 flex justify-between">
+                            <span>Предел: &lt;35</span>
+                            <span id="statusPpeak" class="text-emerald-400 font-bold">ОК</span>
+                        </div>
+                    </div>
+
+                    <!-- PEEP -->
+                    <div class="cyber-glass cyber-card-green rounded-xl p-3 relative overflow-hidden">
+                        <div class="flex justify-between items-start text-xs text-emerald-400 font-semibold mb-1">
+                            <span>PEEP (ПДКВ)</span>
+                            <i class="fa-solid fa-compress"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="valPEEP" class="text-3xl font-cyber font-black text-emerald-300">5.0</span>
+                            <span class="text-xs text-slate-400 font-mono">mbar</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-1 flex justify-between">
+                            <span>Задано: <span id="targetPeepDisp">5.0</span></span>
+                            <span class="text-emerald-400 font-bold">Стабильно</span>
+                        </div>
+                    </div>
+
+                    <!-- MINUTE VENTILATION (VE) / VT -->
+                    <div class="cyber-glass cyber-card-cyan rounded-xl p-3 relative overflow-hidden">
+                        <div class="flex justify-between items-start text-xs text-blue-400 font-semibold mb-1">
+                            <span>VE / Vt (МОВ/ДО)</span>
+                            <i class="fa-solid fa-wind"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="valVE" class="text-2xl font-cyber font-black text-blue-300">6.0</span>
+                            <span class="text-xs text-slate-400 font-mono">L/min</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1 flex justify-between">
+                            <span>Vt: <span id="valVt" class="text-cyan-300 font-mono font-bold">500</span> mL</span>
+                            <span>RR: <span id="valRR" class="text-cyan-300 font-mono font-bold">12</span></span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- REAL-TIME VENTILATOR WAVEFORM GRAPH -->
+                <div class="cyber-glass rounded-xl p-4 relative">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs font-bold text-cyan-400 tracking-wider uppercase font-cyber">График Давления в Дыхательных Путях (Paw / Time)</span>
+                            <span class="text-[11px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded border border-slate-800 font-mono">Режим: <span id="currentModeLabel" class="text-cyan-300 font-bold">PC-VG</span></span>
+                        </div>
+                        <div class="flex items-center space-x-4 text-xs font-mono">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Давление (mbar)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Поток (L/min)</span>
+                        </div>
+                    </div>
+                    <div class="h-64 w-full relative">
+                        <canvas id="ventilatorChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- QUICK CONTROL SLIDERS (HOME PAGE) -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    
+                    <!-- FiO2 Quick Slider -->
+                    <div class="cyber-glass p-3 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-cyan-400">FiO2 (Кислород)</span>
+                            <span class="font-mono text-cyan-300 font-black text-sm" id="fio2Disp">40%</span>
+                        </div>
+                        <input type="range" min="21" max="100" value="40" id="fio2Slider" oninput="updateVentSetting('fio2', this.value)" class="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
+                        <div class="text-[10px] text-slate-500 flex justify-between">
+                            <span>21% (Воздух)</span>
+                            <span>100% (Гипероксия!)</span>
+                        </div>
+                    </div>
+
+                    <!-- RR Quick Slider -->
+                    <div class="cyber-glass p-3 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-blue-400">ЧД (Частота Дыхания)</span>
+                            <span class="font-mono text-blue-300 font-black text-sm" id="rrDisp">12 bpm</span>
+                        </div>
+                        <input type="range" min="4" max="40" value="12" id="rrSlider" oninput="updateVentSetting('rr', this.value)" class="w-full accent-blue-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
+                        <div class="text-[10px] text-slate-500 flex justify-between">
+                            <span>4/мин</span>
+                            <span>40/мин</span>
+                        </div>
+                    </div>
+
+                    <!-- PEEP Quick Slider -->
+                    <div class="cyber-glass p-3 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-emerald-400">PEEP (ПДКВ)</span>
+                            <span class="font-mono text-emerald-300 font-black text-sm" id="peepDisp">5.0 mbar</span>
+                        </div>
+                        <input type="range" min="0" max="20" step="0.5" value="5" id="peepSlider" oninput="updateVentSetting('peep', this.value)" class="w-full accent-emerald-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
+                        <div class="text-[10px] text-slate-500 flex justify-between">
+                            <span>0.0</span>
+                            <span>20.0 mbar</span>
+                        </div>
+                    </div>
+
+                    <!-- Pinsp / Vt Target Quick Slider -->
+                    <div class="cyber-glass p-3 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-purple-400" id="pControlLabel">Pinsp (Давл. вдоха)</span>
+                            <span class="font-mono text-purple-300 font-black text-sm" id="pinspDisp">15 mbar</span>
+                        </div>
+                        <input type="range" min="5" max="45" value="15" id="pinspSlider" oninput="updateVentSetting('pinsp', this.value)" class="w-full accent-purple-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
+                        <div class="text-[10px] text-slate-500 flex justify-between">
+                            <span>5 mbar</span>
+                            <span>45 mbar</span>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ================= TAB 2: ALARMS ================= -->
+            <div id="tabContent-alarms" class="tab-view hidden space-y-4">
+                <div class="cyber-glass rounded-xl p-4">
+                    <h2 class="text-base font-cyber font-bold text-amber-400 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-bell"></i> Панель Мониторинга и Порогов Тревог
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- ACTIVE ALARMS LIST -->
+                        <div class="bg-slate-900/90 border border-slate-800 rounded-lg p-3">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex justify-between items-center">
+                                <span>Активные Тревоги</span>
+                                <button onclick="silenceAlarms()" class="text-[11px] text-cyan-400 hover:underline">Сброс звука</button>
+                            </div>
+                            <div id="activeAlarmsList" class="space-y-2 max-h-60 overflow-y-auto">
+                                <div class="text-xs text-slate-500 italic p-2">Активных тревог нет. Параметры в пределах нормы.</div>
+                            </div>
+                        </div>
+
+                        <!-- ALARM LIMITS ADJUSTMENT -->
+                        <div class="bg-slate-900/90 border border-slate-800 rounded-lg p-3 space-y-3 text-xs">
+                            <div class="font-bold text-slate-300">Настройка Границ Тревог</div>
+
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>SpO2 Нижняя граница: <b id="spo2LimitDisp" class="text-cyan-300">90%</b></span>
+                                </div>
+                                <input type="range" min="80" max="95" value="90" oninput="setAlarmLimit('spo2Low', this.value)" class="w-full accent-cyan-500">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>Ppeak Верхняя граница: <b id="ppeakLimitDisp" class="text-purple-300">35 mbar</b></span>
+                                </div>
+                                <input type="range" min="25" max="50" value="35" oninput="setAlarmLimit('ppeakHigh', this.value)" class="w-full accent-purple-500">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>EtCO2 Диапазон: <b id="etco2LimitsDisp" class="text-amber-300">30 - 50 mmHg</b></span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <input type="range" min="20" max="35" value="30" oninput="setAlarmLimit('etco2Low', this.value)" class="w-full accent-amber-500">
+                                    <input type="range" min="45" max="65" value="50" oninput="setAlarmLimit('etco2High', this.value)" class="w-full accent-amber-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 3: SIMV MODE ================= -->
+            <div id="tabContent-smv" class="tab-view hidden space-y-4">
+                <div class="cyber-glass rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-cyber font-bold text-emerald-400">Синхронизированная Перемежающаяся Принудительная Вентиляция (SIMV)</h2>
+                            <p class="text-xs text-slate-400">Сочетает принудительные вдохи с возможностью спонтанного дыхания пациента.</p>
+                        </div>
+                        <button onclick="activateMode('SIMV')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow-md transition">
+                            Активировать SIMV
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <label class="text-xs font-bold text-emerald-300">Поддержка давлениe (Psupport)</label>
+                            <input type="range" min="0" max="30" value="10" id="psupportSlider" oninput="updateVentSetting('psupport', this.value)" class="w-full accent-emerald-500">
+                            <div class="text-right font-mono text-xs text-emerald-400 font-bold" id="psupportDisp">10 mbar</div>
+                        </div>
+
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <label class="text-xs font-bold text-emerald-300">Триггер Потока (Sens)</label>
+                            <input type="range" min="0.5" max="5.0" step="0.5" value="2.0" id="triggerSlider" oninput="updateVentSetting('trigger', this.value)" class="w-full accent-emerald-500">
+                            <div class="text-right font-mono text-xs text-emerald-400 font-bold" id="triggerDisp">2.0 L/min</div>
+                        </div>
+
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <label class="text-xs font-bold text-emerald-300">Соотношение Вдох/Выдох (I:E)</label>
+                            <select onchange="updateVentSetting('ieRatio', this.value)" class="w-full bg-slate-950 border border-slate-700 text-xs text-slate-200 p-2 rounded">
+                                <option value="1:2" selected>1 : 2.0 (Стандарт)</option>
+                                <option value="1:1.5">1 : 1.5</option>
+                                <option value="1:3">1 : 3.0 (при ХОБЛ)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 4: PC-VG MODE ================= -->
+            <div id="tabContent-pcvg" class="tab-view hidden space-y-4">
+                <div class="cyber-glass rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-cyber font-bold text-blue-400">Контроль Давления с Гарантированным Объемом (PC-VG)</h2>
+                            <p class="text-xs text-slate-400">Интеллектуальный режим: регулирует инспираторное давление для поддержания заданного дыхательного объема.</p>
+                        </div>
+                        <button onclick="activateMode('PC-VG')" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg shadow-md transition">
+                            Активировать PC-VG
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <label class="text-xs font-bold text-blue-300">Целевой Дыхательный Объем (Target Vt)</label>
+                            <input type="range" min="200" max="800" step="10" value="500" id="vtTargetSlider" oninput="updateVentSetting('vtTarget', this.value)" class="w-full accent-blue-500">
+                            <div class="text-right font-mono text-xs text-blue-400 font-bold" id="vtTargetDisp">500 mL</div>
+                        </div>
+
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <label class="text-xs font-bold text-blue-300">Максимальное Давление (Pmax Limit)</label>
+                            <input type="range" min="20" max="50" value="38" id="pmaxSlider" oninput="updateVentSetting('pmax', this.value)" class="w-full accent-blue-500">
+                            <div class="text-right font-mono text-xs text-blue-400 font-bold" id="pmaxDisp">38 mbar</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 5: LAB / BLOOD GAS (КЩС) ================= -->
+            <div id="tabContent-lab" class="tab-view hidden space-y-4">
+                <div class="cyber-glass rounded-xl p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-base font-cyber font-bold text-purple-400 flex items-center gap-2">
+                            <i class="fa-solid fa-flask"></i> Кислотно-Щелочное Состояние Крови (Газы Крови / КЩС)
+                        </h2>
+                        <button onclick="takeBloodGasSample()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-vial"></i> Взять Анализ КЩС
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                        <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-lg">
+                            <div class="text-xs text-slate-400">Водородный показатель (pH)</div>
+                            <div id="labPH" class="text-2xl font-mono font-bold text-purple-300">7.38</div>
+                            <div class="text-[10px] text-slate-500">Норма: 7.35 - 7.45</div>
+                        </div>
+
+                        <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-lg">
+                            <div class="text-xs text-slate-400">PaCO2 (Парц. CO2)</div>
+                            <div id="labPaCO2" class="text-2xl font-mono font-bold text-amber-300">40 mmHg</div>
+                            <div class="text-[10px] text-slate-500">Норма: 35 - 45 mmHg</div>
+                        </div>
+
+                        <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-lg">
+                            <div class="text-xs text-slate-400">PaO2 (Парц. O2)</div>
+                            <div id="labPaO2" class="text-2xl font-mono font-bold text-cyan-300">92 mmHg</div>
+                            <div class="text-[10px] text-slate-500">Норма: 80 - 100 mmHg</div>
+                        </div>
+
+                        <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-lg">
+                            <div class="text-xs text-slate-400">HCO3- (Бикарбонат)</div>
+                            <div id="labHCO3" class="text-2xl font-mono font-bold text-emerald-300">24 mmol/L</div>
+                            <div class="text-[10px] text-slate-500">Норма: 22 - 26 mmol/L</div>
+                        </div>
+                    </div>
+
+                    <!-- DIAGNOSIS SUMMARY -->
+                    <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
+                        <span class="text-slate-400">Заключение КЩС:</span>
+                        <span id="labDiagnosis" class="font-bold text-emerald-400 font-mono text-sm">Нормокапния, Нормоксия (Норма)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 6: EVENT LOG ================= -->
+            <div id="tabContent-log" class="tab-view hidden space-y-4">
+                <div class="cyber-glass rounded-xl p-4">
+                    <h2 class="text-base font-cyber font-bold text-slate-300 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ul"></i> Системный Журнал Событий и Врачебных Назначений
+                    </h2>
+                    <div id="eventLogList" class="bg-slate-950 font-mono text-xs border border-slate-800 rounded-lg p-3 h-80 overflow-y-auto space-y-1.5 text-slate-300">
+                        <!-- Dynamic logs here -->
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- OVERLAY MODAL FOR DEATH / RESUSCITATION FAIL -->
+    <div id="deathModal" class="fixed inset-0 bg-red-950/90 backdrop-blur-md z-50 flex flex-col items-center justify-center hidden p-4">
+        <div class="cyber-glass border-2 border-rose-500 p-6 rounded-2xl max-w-md w-full text-center space-y-4 shadow-2xl">
+            <i class="fa-solid fa-skull-crossbones text-5xl text-rose-500 animate-bounce"></i>
+            <h1 class="text-2xl font-cyber font-black text-rose-400">ОСТАНОВКА СЕРДЦА / АСИСТОЛИЯ</h1>
+            <p id="deathReasonText" class="text-xs text-slate-300 font-mono">Пациент скончался от тяжелой гипоксии и асистолии.</p>
+            <div class="pt-2">
+                <button onclick="resuscitatePatient()" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg transition">
+                    <i class="fa-solid fa-heart-pulse mr-2"></i> Реанимировать Пациента
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC & SOUND ENGINE -->
+    <script>
+        /* ===================================================================
+           1. AUDIO / SOUND ENGINE (Web Audio API Synthesizer)
+           =================================================================== */
+        let audioCtx = null;
+        let isAudioMuted = false;
+        let ventilationVentSoundNode = null;
+        let flatlineOsc = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleMasterAudio() {
+            initAudio();
+            isAudioMuted = !isAudioMuted;
+            const btnLabel = document.getElementById('audioMasterLabel');
+            const btnIcon = document.getElementById('audioMasterIcon');
+
+            if (isAudioMuted) {
+                btnLabel.innerText = "Звук Выкл";
+                btnIcon.className = "fa-solid fa-volume-xmark text-slate-500";
+                stopFlatlineTone();
+            } else {
+                btnLabel.innerText = "Звук Вкл";
+                btnIcon.className = "fa-solid fa-volume-high text-cyan-400";
+            }
+        }
+
+        // Play Breath Hiss (Inhale / Exhale air flow)
+        function playBreathSound(isInhale, duration) {
+            if (isAudioMuted || !audioCtx) return;
+            try {
+                const bufferSize = audioCtx.sampleRate * duration;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1; // White noise
+                }
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = isInhale ? 'bandpass' : 'lowpass';
+                filter.frequency.setValueAtTime(isInhale ? 800 : 400, audioCtx.currentTime);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(isInhale ? 0.08 : 0.05, audioCtx.currentTime + duration * 0.3);
+                gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                noise.start();
+            } catch(e) {}
+        }
+
+        // Strict 2-Tone Medical Alarm Sound
+        function playAlarmBeep() {
+            if (isAudioMuted || !audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(960, now);
+                osc.frequency.setValueAtTime(720, now + 0.15);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } catch(e){}
+        }
+
+        // Flatline Continuous Tone
+        function startFlatlineTone() {
+            if (isAudioMuted || !audioCtx || flatlineOsc) return;
+            try {
+                flatlineOsc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                flatlineOsc.type = 'sawtooth';
+                flatlineOsc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                flatlineOsc.connect(gain);
+                gain.connect(audioCtx.destination);
+                flatlineOsc.start();
+            } catch(e){}
+        }
+
+        function stopFlatlineTone() {
+            if (flatlineOsc) {
+                try { flatlineOsc.stop(); } catch(e){}
+                flatlineOsc = null;
+            }
+        }
+
+        // Defibrillator / Turbocharge Sound Effect
+        function playDefibChargeSound() {
+            if (isAudioMuted || !audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 1.2);
+
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.2, now + 1.0);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 1.3);
+            } catch(e){}
+        }
+
+
+        /* ===================================================================
+           2. STATE & PHYSIOLOGY ENGINE
+           =================================================================== */
+        let state = {
+            isAlive: true,
+            simSpeed: 1,
+            timeSeconds: 0,
+            activeTab: 'home',
+            mode: 'PC-VG', // 'PC-VG' or 'SIMV'
+
+            // Ventilator Settings
+            fio2: 40,        // %
+            rr: 12,          // bpm
+            peep: 5.0,       // mbar
+            pinsp: 15,       // mbar
+            psupport: 10,    // mbar
+            trigger: 2.0,    // L/min
+            vtTarget: 500,   // mL
+            pmax: 38,        // mbar
+
+            // Patient Physiological Vitals
+            spo2: 98,        // %
+            hr: 75,          // bpm
+            etco2: 38,       // mmHg
+            ppeak: 20,       // mbar
+            vtMeasured: 500, // mL
+            veMeasured: 6.0, // L/min
+
+            // Blood Gas (КЩС)
+            ph: 7.38,
+            paCO2: 40,
+            paO2: 92,
+            hco3: 24,
+
+            // Interventions & Conditions
+            aspirationActive: false,
+            hyperoxiaTimer: 0,   // Toxic high oxygen/ventilation time
+            hypoxiaTimer: 0,     // Toxic low oxygen time
+            alarmSilencedUntil: 0
+        };
+
+        let alarmLimits = {
+            spo2Low: 90,
+            ppeakHigh: 35,
+            etco2Low: 30,
+            etco2High: 50
+        };
+
+        let activeAlarms = new Set();
+
+
+        /* ===================================================================
+           3. UI NAVIGATION & TABS
+           =================================================================== */
+        function switchTab(tabId) {
+            initAudio();
+            state.activeTab = tabId;
+
+            document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-tab-btn').forEach(el => {
+                el.classList.remove('cyber-glass-active', 'text-cyan-400');
+                el.classList.add('text-slate-400');
+            });
+
+            const contentEl = document.getElementById(`tabContent-${tabId}`);
+            if (contentEl) contentEl.classList.remove('hidden');
+
+            const btnEl = document.getElementById(`tabBtn-${tabId}`);
+            if (btnEl) {
+                btnEl.classList.add('cyber-glass-active', 'text-cyan-400');
+                btnEl.classList.remove('text-slate-400');
+            }
+        }
+
+        function setSimSpeed(spd) {
+            state.simSpeed = spd;
+            ['spd1', 'spd2', 'spd5'].forEach(id => {
+                const btn = document.getElementById(id);
+                btn.className = "px-2 py-0.5 rounded text-slate-400 hover:text-white";
+            });
+            document.getElementById(`spd${spd}`).className = "px-2 py-0.5 rounded bg-cyan-600 text-white font-bold";
+            logEvent(`Изменена скорость симуляции: ${spd}x`);
+        }
+
+
+        /* ===================================================================
+           4. PHYSIOLOGICAL SIMULATION LOOP
+           =================================================================== */
+        function updatePhysiology() {
+            if (!state.isAlive) return;
+
+            // Calculate Minute Ventilation (VE)
+            state.vtMeasured = state.mode === 'PC-VG' ? state.vtTarget : Math.round(state.pinsp * 32);
+            state.veMeasured = parseFloat(((state.vtMeasured * state.rr) / 1000).toFixed(1));
+            state.ppeak = state.mode === 'PC-VG' ? Math.round(10 + (state.vtTarget / 35)) : state.pinsp + state.peep;
+
+            // ASPIRATION EFFECT: Drops PEEP and creates airway obstruction
+            if (state.aspirationActive) {
+                state.ppeak += 8;
+                state.etco2 = Math.min(65, state.etco2 + 0.4);
+                state.spo2 = Math.max(70, state.spo2 - 0.5);
+            }
+
+            // FiO2 -> PaO2 & SpO2 relationship
+            let targetPaO2 = state.fio2 * 2.2 - (state.aspirationActive ? 30 : 0);
+            state.paO2 += (targetPaO2 - state.paO2) * 0.05;
+            
+            // Saturation Curve Estimation
+            let targetSpO2 = Math.min(100, Math.max(50, (state.paO2 / 1.1)));
+            state.spo2 += (targetSpO2 - state.spo2) * 0.05;
+
+            // Ventilation (VE) -> PaCO2 & EtCO2
+            let targetPaCO2 = 40 * (6.0 / Math.max(1, state.veMeasured));
+            state.paCO2 += (targetPaCO2 - state.paCO2) * 0.05;
+            state.etco2 = Math.round(state.paCO2 * 0.92);
+
+            // pH calculation (Henderson-Hasselbalch simplified)
+            state.ph = parseFloat((7.40 + (40 - state.paCO2) * 0.008).toFixed(2));
+
+            // Toxicity Timers (Hypoxia vs Hyperoxia / Hyperventilation)
+            if (state.spo2 < 82) {
+                state.hypoxiaTimer += state.simSpeed;
+                state.hr = Math.max(30, state.hr - 1);
+            } else if (state.fio2 > 85 && state.spo2 >= 99) {
+                state.hyperoxiaTimer += state.simSpeed;
+            } else {
+                state.hypoxiaTimer = Math.max(0, state.hypoxiaTimer - 1);
+                state.hyperoxiaTimer = Math.max(0, state.hyperoxiaTimer - 1);
+                // HR drift back to normal
+                state.hr += (75 - state.hr) * 0.05;
+            }
+
+            // LETHAL CONDITIONS CHECK (>10 seconds toxic threshold)
+            if (state.hypoxiaTimer > 10) {
+                triggerDeath("Тяжелая Гипоксия и Асистолия (SpO2 < 80% более 10 сек)");
+            } else if (state.hyperoxiaTimer > 15) {
+                triggerDeath("Гипероксическая Токсичность и Фибрилляция (FiO2 > 85% более 15 сек)");
+            }
+
+            // Check Alarms
+            checkAlarms();
+
+            // Render updated values to DOM
+            renderVitals();
+        }
+
+
+        /* ===================================================================
+           5. ALARMS ENGINE
+           =================================================================== */
+        function checkAlarms() {
+            activeAlarms.clear();
+
+            if (state.spo2 < alarmLimits.spo2Low) {
+                activeAlarms.add(`SpO2 НИЗКИЙ (${Math.round(state.spo2)}%)`);
+            }
+            if (state.ppeak > alarmLimits.ppeakHigh) {
+                activeAlarms.add(`ВЫСОКОЕ ДАВЛЕНИЕ Ppeak (${state.ppeak} mbar)`);
+            }
+            if (state.etco2 < alarmLimits.etco2Low) {
+                activeAlarms.add(`ГИПОКАПНИЯ EtCO2 (${state.etco2} mmHg)`);
+            }
+            if (state.etco2 > alarmLimits.etco2High) {
+                activeAlarms.add(`ГИПЕРКАПНИЯ EtCO2 (${state.etco2} mmHg)`);
+            }
+
+            // Update UI Banner
+            const banner = document.getElementById('headerAlarmBanner');
+            const alarmText = document.getElementById('headerAlarmText');
+            const badge = document.getElementById('activeAlarmCountBadge');
+            const list = document.getElementById('activeAlarmsList');
+
+            if (activeAlarms.size > 0 && state.isAlive) {
+                const firstAlarm = Array.from(activeAlarms)[0];
+                banner.classList.remove('hidden');
+                alarmText.innerText = `ТРЕВОГА: ${firstAlarm}`;
+                badge.innerText = activeAlarms.size;
+                badge.classList.remove('hidden');
+
+                if (state.timeSeconds > state.alarmSilencedUntil) {
+                    playAlarmBeep();
+                }
+
+                // Render active alarms tab list
+                list.innerHTML = Array.from(activeAlarms).map(al => `
+                    <div class="p-2 bg-rose-950/80 border border-rose-600/80 text-rose-200 rounded flex items-center justify-between text-xs font-bold animate-pulse">
+                        <span><i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${al}</span>
+                        <span class="text-[10px] bg-rose-900 px-1.5 py-0.5 rounded">КРИТИЧЕСКИ</span>
+                    </div>
+                `).join('');
+
+            } else {
+                banner.classList.add('hidden');
+                badge.classList.add('hidden');
+                list.innerHTML = `<div class="text-xs text-slate-500 italic p-2">Активных тревог нет. Параметры в пределах нормы.</div>`;
+            }
+        }
+
+        function silenceAlarms() {
+            state.alarmSilencedUntil = state.timeSeconds + 120; // Silence for 2 minutes
+            logEvent("Звуковой сигнал тревоги заглушен на 120 секунд");
+        }
+
+        function setAlarmLimit(param, val) {
+            alarmLimits[param] = parseFloat(val);
+            if (param === 'spo2Low') document.getElementById('spo2LimitDisp').innerText = `${val}%`;
+            if (param === 'ppeakHigh') document.getElementById('ppeakLimitDisp').innerText = `${val} mbar`;
+            if (param === 'etco2Low' || param === 'etco2High') {
+                document.getElementById('etco2LimitsDisp').innerText = `${alarmLimits.etco2Low} - ${alarmLimits.etco2High} mmHg`;
+            }
+        }
+
+
+        /* ===================================================================
+           6. CLINICAL INTERVENTIONS (ASPIRATION, DRUGS, TURBOCHARGE)
+           =================================================================== */
+        function toggleAspiration() {
+            initAudio();
+            state.aspirationActive = !state.aspirationActive;
+            const btn = document.getElementById('aspirationBtn');
+            const badge = document.getElementById('aspBadge');
+
+            if (state.aspirationActive) {
+                btn.className = "w-full py-2.5 px-3 rounded-lg bg-amber-600 text-white text-xs font-semibold flex items-center justify-between transition animate-pulse";
+                badge.innerText = "АКТИВЕН";
+                badge.className = "text-[10px] px-1.5 py-0.5 rounded bg-amber-900 text-amber-100 font-bold";
+                logEvent("ВКЛЮЧЕНА санация дыхательных путей (Отсос)");
+                
+                // Auto turn-off after 6 seconds
+                setTimeout(() => {
+                    if (state.aspirationActive) {
+                        toggleAspiration();
+                    }
+                }, 6000);
+            } else {
+                btn.className = "w-full py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-amber-950/60 border border-slate-700 hover:border-amber-500 text-slate-300 hover:text-amber-300 text-xs font-semibold flex items-center justify-between transition";
+                badge.innerText = "ВЫКЛ";
+                badge.className = "text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400";
+                logEvent("Санация дыхательных путей завершена");
+            }
+        }
+
+        function administerDrug(drug) {
+            initAudio();
+            if (drug === 'adrenaline') {
+                state.hr = Math.min(160, state.hr + 35);
+                state.spo2 = Math.min(100, state.spo2 + 3);
+                logEvent("Введено лекарство: Адреналин (1 мг IV) -> ЧСС повышена");
+            } else if (drug === 'surfactant') {
+                state.vtMeasured += 80;
+                logEvent("Введено лекарство: Сурфактант -> Повышение податливости легких");
+            } else if (drug === 'sedation') {
+                state.rr = Math.max(8, state.rr - 2);
+                document.getElementById('rrSlider').value = state.rr;
+                document.getElementById('rrDisp').innerText = `${state.rr} bpm`;
+                logEvent("Введена седация (Пропофол) -> Частота дыхания снижена");
+            }
+        }
+
+        function triggerResuscitationTurbocharge() {
+            initAudio();
+            playDefibChargeSound();
+
+            state.mode = 'PC-VG';
+            state.fio2 = 100;
+            state.rr = 16;
+            state.peep = 8.0;
+            state.vtTarget = 520;
+
+            // Sync controls
+            document.getElementById('fio2Slider').value = 100;
+            document.getElementById('fio2Disp').innerText = "100%";
+            document.getElementById('rrSlider').value = 16;
+            document.getElementById('rrDisp').innerText = "16 bpm";
+            document.getElementById('peepSlider').value = 8.0;
+            document.getElementById('peepDisp').innerText = "8.0 mbar";
+            document.getElementById('vtTargetSlider').value = 520;
+            document.getElementById('vtTargetDisp').innerText = "520 mL";
+
+            state.spo2 = 99;
+            state.hr = 90;
+            state.hypoxiaTimer = 0;
+            state.hyperoxiaTimer = 0;
+
+            activateMode('PC-VG');
+            logEvent("⚡ АКТИВИРОВАН TURBOCHARGE: Мгновенная реанимация в режиме PC-VG (FiO2 100%)");
+        }
+
+        function triggerDeath(reason) {
+            state.isAlive = false;
+            startFlatlineTone();
+            document.getElementById('deathReasonText').innerText = reason;
+            document.getElementById('deathModal').classList.remove('hidden');
+            logEvent(`КРИТИЧЕСКАЯ ОСТАНОВКА СИСТЕМЫ: ${reason}`);
+        }
+
+        function resuscitatePatient() {
+            stopFlatlineTone();
+            state.isAlive = true;
+            state.spo2 = 98;
+            state.hr = 75;
+            state.hypoxiaTimer = 0;
+            state.hyperoxiaTimer = 0;
+            document.getElementById('deathModal').classList.add('hidden');
+            logEvent("Успешная реанимация пациента. Сигналы восстановлены.");
+        }
+
+
+        /* ===================================================================
+           7. VENTILATION MODES & CONTROL UPDATES
+           =================================================================== */
+        function updateVentSetting(param, val) {
+            val = parseFloat(val);
+            state[param] = val;
+
+            if (param === 'fio2') document.getElementById('fio2Disp').innerText = `${val}%`;
+            if (param === 'rr') document.getElementById('rrDisp').innerText = `${val} bpm`;
+            if (param === 'peep') {
+                document.getElementById('peepDisp').innerText = `${val.toFixed(1)} mbar`;
+                document.getElementById('targetPeepDisp').innerText = val.toFixed(1);
+            }
+            if (param === 'pinsp') document.getElementById('pinspDisp').innerText = `${val} mbar`;
+            if (param === 'psupport') document.getElementById('psupportDisp').innerText = `${val} mbar`;
+            if (param === 'trigger') document.getElementById('triggerDisp').innerText = `${val.toFixed(1)} L/min`;
+            if (param === 'vtTarget') document.getElementById('vtTargetDisp').innerText = `${val} mL`;
+            if (param === 'pmax') document.getElementById('pmaxDisp').innerText = `${val} mbar`;
+
+            logEvent(`Параметр ${param.toUpperCase()} изменен на ${val}`);
+        }
+
+        function activateMode(modeName) {
+            state.mode = modeName;
+            document.getElementById('currentModeLabel').innerText = modeName;
+
+            const pLabel = document.getElementById('pControlLabel');
+            if (modeName === 'PC-VG') {
+                pLabel.innerText = "Целевой Vt (Объем)";
+                document.getElementById('pinspDisp').innerText = `${state.vtTarget} mL`;
+            } else {
+                pLabel.innerText = "Pinsp (Давл. вдоха)";
+                document.getElementById('pinspDisp').innerText = `${state.pinsp} mbar`;
+            }
+            logEvent(`Режим вентиляции переключен на: ${modeName}`);
+        }
+
+        function takeBloodGasSample() {
+            logEvent(`Анализ КЩС: pH=${state.ph}, PaCO2=${Math.round(state.paCO2)}mmHg, PaO2=${Math.round(state.paO2)}mmHg, HCO3=${state.hco3}mmol/L`);
+            
+            document.getElementById('labPH').innerText = state.ph;
+            document.getElementById('labPaCO2').innerText = `${Math.round(state.paCO2)} mmHg`;
+            document.getElementById('labPaO2').innerText = `${Math.round(state.paO2)} mmHg`;
+            document.getElementById('labHCO3').innerText = `${state.hco3} mmol/L`;
+
+            let diag = "Нормальное состояние КЩС";
+            if (state.ph < 7.35) diag = "Респираторный Ацидоз";
+            else if (state.ph > 7.45) diag = "Респираторный Алкалоз";
+            if (state.paO2 < 80) diag += " с Гипоксимией";
+
+            document.getElementById('labDiagnosis').innerText = diag;
+            switchTab('lab');
+        }
+
+
+        /* ===================================================================
+           8. CHART & WAVEFORM RENDERING (Chart.js)
+           =================================================================== */
+        let chartCtx = document.getElementById('ventilatorChart').getContext('2d');
+        let chartPoints = 60;
+        let chartDataPressure = new Array(chartPoints).fill(state.peep);
+        let chartDataFlow = new Array(chartPoints).fill(0);
+        let chartLabels = new Array(chartPoints).fill('');
+
+        let ventChart = new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    {
+                        label: 'Давление (Paw)',
+                        data: chartDataPressure,
+                        borderColor: '#06b6d4',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        fill: false
+                    },
+                    {
+                        label: 'Поток (Flow)',
+                        data: chartDataFlow,
+                        borderColor: '#10b981',
+                        borderWidth: 1.5,
+                        tension: 0.2,
+                        pointRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: { display: false },
+                    y: {
+                        min: -10,
+                        max: 50,
+                        grid: { color: '#1e293b' },
+                        ticks: { color: '#64748b', font: { family: 'Share Tech Mono' } }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        let breathPhaseTime = 0;
+        function updateWaveform() {
+            if (!state.isAlive) return;
+
+            let breathCycleDuration = 60 / state.rr; // Seconds per breath
+            breathPhaseTime += 0.1 * state.simSpeed;
+
+            if (breathPhaseTime >= breathCycleDuration) {
+                breathPhaseTime = 0;
+                playBreathSound(true, breathCycleDuration * 0.35); // Inhale hiss
+            }
+
+            let pressureVal = state.peep;
+            let flowVal = 0;
+            let inspireTime = breathCycleDuration * 0.35;
+
+            if (breathPhaseTime < inspireTime) {
+                // Inhalation Phase
+                let progress = breathPhaseTime / inspireTime;
+                pressureVal = state.peep + (state.ppeak - state.peep) * Math.sin(progress * Math.PI);
+                flowVal = 40 * Math.cos(progress * Math.PI / 2);
+            } else {
+                // Exhalation Phase
+                let progress = (breathPhaseTime - inspireTime) / (breathCycleDuration - inspireTime);
+                pressureVal = state.peep + (state.ppeak - state.peep) * Math.exp(-progress * 4);
+                flowVal = -30 * Math.exp(-progress * 3);
+            }
+
+            chartDataPressure.shift();
+            chartDataPressure.push(pressureVal);
+            chartDataFlow.shift();
+            chartDataFlow.push(flowVal);
+
+            ventChart.update('none');
+        }
+
+
+        /* ===================================================================
+           9. UI RENDERING & EVENT LOGGING
+           =================================================================== */
+        function renderVitals() {
+            document.getElementById('valSpO2').innerText = Math.round(state.spo2);
+            document.getElementById('valHR').innerText = Math.round(state.hr);
+            document.getElementById('valEtCO2').innerText = Math.round(state.etco2);
+            document.getElementById('valPpeak').innerText = Math.round(state.ppeak);
+            document.getElementById('valPEEP').innerText = state.peep.toFixed(1);
+            document.getElementById('valVE').innerText = state.veMeasured.toFixed(1);
+            document.getElementById('valVt').innerText = state.vtMeasured;
+            document.getElementById('valRR').innerText = state.rr;
+        }
+
+        function logEvent(msg) {
+            const timeStr = new Date().toLocaleTimeString();
+            const logBox = document.getElementById('eventLogList');
+            if (logBox) {
+                const item = document.createElement('div');
+                item.className = "text-slate-300 border-b border-slate-900 py-0.5 flex gap-2";
+                item.innerHTML = `<span class="text-cyan-500 font-bold">[${timeStr}]</span> <span>${msg}</span>`;
+                logBox.prepend(item);
+            }
+        }
+
+
+        /* ===================================================================
+           10. MAIN SYSTEM LOOP & INITIALIZATION
+           =================================================================== */
+        setInterval(() => {
+            state.timeSeconds += state.simSpeed;
+
+            // Update Clock
+            const hrs = String(Math.floor(state.timeSeconds / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((state.timeSeconds % 3600) / 60)).padStart(2, '0');
+            const secs = String(state.timeSeconds % 60).padStart(2, '0');
+            document.getElementById('clockDisplay').innerText = `${hrs}:${mins}:${secs}`;
+
+            updatePhysiology();
+        }, 1000);
+
+        // Fast Waveform Refresh Loop (100ms)
+        setInterval(() => {
+            updateWaveform();
+        }, 100);
+
+        window.onload = function() {
+            logEvent("Система Manio.japan linuxsteal 16.0 Pro ICU успешно запущена.");
+            logEvent("Загружены профили легких. Режим PC-VG активирован по умолчанию.");
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Minecraft Web</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Arial', sans-serif; user-select: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); pointer-events: none; }
+        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: white; }
+        #crosshair::before { left: 4px; top: 0; width: 2px; height: 10px; }
+        #crosshair::after { left: 0; top: 4px; width: 10px; height: 2px; }
+        
+        #hud { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+        .stats-bar { display: flex; gap: 20px; margin-bottom: 5px; font-size: 20px; }
+        
+        #hotbar { display: flex; background: rgba(0,0,0,0.6); border: 2px solid #555; padding: 4px; border-radius: 6px; }
+        .slot { width: 44px; height: 44px; border: 2px solid #333; margin: 2px; background: rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; font-size: 11px; color: white; text-align: center; }
+        .slot.active { border-color: yellow; background: rgba(255,255,255,0.3); }
+
+        #block-preview { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 4px; font-size: 14px; }
+        
+        #instructions { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 10px; text-align: center; cursor: pointer; border: 2px solid #777; }
+        
+        #trade-ui { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; color: white; padding: 20px; border: 3px solid #777; border-radius: 8px; text-align: center; }
+        #trade-ui button { background: #444; color: white; border: 1px solid #999; padding: 8px 16px; margin: 5px; cursor: pointer; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="crosshair"></div>
+    <div id="block-preview">Выбран предмет: <span id="item-name">Трава</span></div>
+
+    <div id="hud">
+        <div class="stats-bar">
+            <div id="hearts">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</div>
+            <div id="hunger">🍖🍖🍖🍖🍖🍖🍖🍖🍖🍖</div>
+        </div>
+        <div id="hotbar">
+            <div class="slot active" id="slot-0">Трава</div>
+            <div class="slot" id="slot-1">Земля</div>
+            <div class="slot" id="slot-2">Камень</div>
+            <div class="slot" id="slot-3">Дерево</div>
+            <div class="slot" id="slot-4">Доски</div>
+            <div class="slot" id="slot-5">Меч</div>
+            <div class="slot" id="slot-6">Еда</div>
+        </div>
+    </div>
+
+    <div id="instructions">
+        <h2>Кликни, чтобы играть в 3D Minecraft</h2>
+        <p><b>W, A, S, D</b> — Перемещение | <b>Пробел</b> — Прыжок</p>
+        <p><b>Мышь</b> — Обзор | <b>ЛКМ</b> — Ломать / Бить | <b>ПКМ</b> — Ставить / Есть / Торговать</p>
+        <p><b>1-7</b> — Выбор хотбара</p>
+    </div>
+
+    <div id="trade-ui">
+        <h3>Торговля с Жителем</h3>
+        <p>Обменять 2 Дерева на 1 Мясо?</p>
+        <button id="buy-food">Купить Еду</button>
+        <button id="close-trade">Закрыть</button>
+    </div>
+
+    <script>
+        // Настройка сцены
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.FogExp2(0x87CEEB, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        document.body.appendChild(renderer.domElement);
+
+        // Свет
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, 100, 50);
+        scene.add(dirLight);
+
+        // Генерация мира
+        const WORLD_SIZE = 32;
+        const blocks = new Map();
+        const blockGeo = new THREE.BoxGeometry(1, 1, 1);
+        
+        const materials = {
+            grass: new THREE.MeshLambertMaterial({ color: 0x55aa55 }),
+            dirt: new THREE.MeshLambertMaterial({ color: 0x8B4513 }),
+            stone: new THREE.MeshLambertMaterial({ color: 0x808080 }),
+            wood: new THREE.MeshLambertMaterial({ color: 0x654321 }),
+            planks: new THREE.MeshLambertMaterial({ color: 0xc19a6b }),
+            leaves: new THREE.MeshLambertMaterial({ color: 0x228B22 })
+        };
+
+        function getBlockKey(x, y, z) { return `${x},${y},${z}`; }
+
+        function addBlock(x, y, z, type) {
+            const key = getBlockKey(x, y, z);
+            if (blocks.has(key)) return;
+            const mesh = new THREE.Mesh(blockGeo, materials[type]);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            blocks.set(key, { mesh, type });
+        }
+
+        // Простая генерация ландшафта
+        for (let x = -WORLD_SIZE; x < WORLD_SIZE; x++) {
+            for (let z = -WORLD_SIZE; z < WORLD_SIZE; z++) {
+                let h = Math.floor(Math.sin(x * 0.1) * 2 + Math.cos(z * 0.1) * 2);
+                addBlock(x, h, z, 'grass');
+                addBlock(x, h - 1, z, 'dirt');
+                addBlock(x, h - 2, z, 'stone');
+
+                // Спавн деревушки в центре
+                if (Math.abs(x) < 5 && Math.abs(z) < 5 && Math.random() < 0.05) {
+                    for(let y=1; y<=3; y++) addBlock(x, h+y, z, 'wood');
+                    addBlock(x, h+4, z, 'planks');
+                }
+            }
+        }
+
+        // Игрок
+        const player = {
+            pos: new THREE.Vector3(0, 5, 0),
+            vel: new THREE.Vector3(),
+            hp: 10,
+            hunger: 10,
+            selectedSlot: 0
+        };
+
+        let yaw = 0, pitch = 0;
+        let keys = {};
+
+        // Мобы
+        const zombies = [];
+        function createZombie(x, z) {
+            const zMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.8, 1.8, 0.8),
+                new THREE.MeshLambertMaterial({ color: 0x2e8b57 })
+            );
+            zMesh.position.set(x, 3, z);
+            scene.add(zMesh);
+            zombies.push({ mesh: zMesh, hp: 3 });
+        }
+        createZombie(5, 5);
+
+        // Управление мышью
+        const instructions = document.getElementById('instructions');
+        instructions.addEventListener('click', () => {
+            document.body.requestPointerLock();
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            instructions.style.display = document.pointerLockElement === document.body ? 'none' : 'block';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement !== document.body) return;
+            yaw -= e.movementX * 0.002;
+            pitch -= e.movementY * 0.002;
+            pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
+        });
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.key >= '1' && e.key <= '7') {
+                player.selectedSlot = parseInt(e.key) - 1;
+                document.querySelectorAll('.slot').forEach((s, i) => {
+                    s.classList.toggle('active', i === player.selectedSlot);
+                });
+            }
+        });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+        // Главный физический цикл
+        let lastAttack = 0;
+        function update() {
+            // Вращение камеры
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
+
+            // Движение игрока
+            const speed = 0.12;
+            const moveDir = new THREE.Vector3();
+            if (keys['KeyW']) moveDir.z -= 1;
+            if (keys['KeyS']) moveDir.z += 1;
+            if (keys['KeyA']) moveDir.x -= 1;
+            if (keys['KeyD']) moveDir.x += 1;
+            moveDir.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+
+            player.pos.x += moveDir.x * speed;
+            player.pos.z += moveDir.z * speed;
+
+            // Гравитация
+            player.vel.y -= 0.01;
+            player.pos.y += player.vel.y;
+
+            // Простая коллизия с землей
+            if (player.pos.y < 3) {
+                player.pos.y = 3;
+                player.vel.y = 0;
+                if (keys['Space']) player.vel.y = 0.22;
+            }
+
+            camera.position.copy(player.pos);
+
+            // ИИ Зомби (преследование и урон)
+            zombies.forEach(z => {
+                const dir = new THREE.Vector3().subVectors(player.pos, z.mesh.position);
+                dir.y = 0;
+                if (dir.length() < 12 && dir.length() > 0.8) {
+                    dir.normalize();
+                    z.mesh.position.addScaledVector(dir, 0.04);
+                }
+                
+                // Атака игрока
+                if (dir.length() <= 1.2 && Date.now() - lastAttack > 1000) {
+                    player.hp = Math.max(0, player.hp - 1);
+                    document.getElementById('hearts').innerText = '❤️'.repeat(player.hp);
+                    lastAttack = Date.now();
+                }
+            });
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(update);
+        }
+
+        update();
+
+        // Адаптация под размер окна
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
